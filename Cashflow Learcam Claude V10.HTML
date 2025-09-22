@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Análisis de Flujo de Fondos - Learcam</title>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box;}
+    body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;
+         background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);
+         min-height:100vh;padding:20px;}
+    .container{max-width:1400px;margin:0 auto;background:#fff;border-radius:20px;
+               box-shadow:0 20px 40px rgba(0,0,0,0.1);overflow:hidden;}
+    .header{background:linear-gradient(45deg,#2c3e50,#3498db);color:#fff;padding:30px;text-align:center;}
+    .header h1{font-size:2.2rem;margin-bottom:8px;text-shadow:2px 2px 4px rgba(0,0,0,0.25);}
+    .main-content{display:grid;grid-template-columns:45% 55%;}
+    .form-section{padding:30px;background:#f8f9fa;border-right:1px solid #dee2e6;}
+    .results-section{padding:30px;background:#fff;}
+    .section-title{font-size:1.4rem;color:#2c3e50;margin-bottom:22px;padding-bottom:10px;border-bottom:3px solid #3498db;}
+    .form-category{background:#fff;padding:18px;border-radius:12px;margin-bottom:18px;box-shadow:0 2px 10px rgba(0,0,0,0.05);}
+    .form-category h3{color:#3498db;margin-bottom:12px;font-size:1.05rem;}
+    .form-group{margin-bottom:12px;}
+    .form-group label{display:block;margin-bottom:6px;font-weight:600;color:#2c3e50;font-size:0.9rem;}
+    .form-group input,.form-group select{width:100%;padding:10px;border:2px solid #e1e8ed;border-radius:8px;font-size:13px;transition:all .2s;}
+    .form-group input:focus,.form-group select:focus{border-color:#3498db;box-shadow:0 0 0 3px rgba(52,152,219,0.15);outline:none;}
+    .calculate-btn{width:100%;padding:14px;background:linear-gradient(45deg,#3498db,#2980b9);color:#fff;border:none;
+                   border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;text-transform:uppercase;letter-spacing:.5px;}
+    .calculate-btn:hover{filter:brightness(1.05);}
+    .semaforo{display:flex;justify-content:center;gap:18px;margin:8px 0 18px;}
+    .light{width:60px;height:60px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+           font-size:1.4rem;color:#fff;opacity:.3;}
+    .active{opacity:1;box-shadow:0 0 18px rgba(0,0,0,.25);}
+    .verde{background:#27ae60;} .amarillo{background:#f39c12;} .rojo{background:#e74c3c;}
+    .metrics-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;margin:10px 0 22px;}
+    .metric-card{padding:18px;text-align:center;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:#fff;
+                 border-radius:12px;box-shadow:0 6px 20px rgba(0,0,0,0.08);}
+    .metric-label{font-size:.85rem;opacity:.9;margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px;}
+    .metric-value{font-size:1.3rem;font-weight:800;}
+    .flow-table{background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 4px 15px rgba(0,0,0,0.08);margin-top:6px;}
+    .flow-table h3{background:linear-gradient(135deg,#e67e22,#d35400);color:#fff;padding:14px 18px;margin:0;font-size:1.05rem;}
+    .flow-table table{width:100%;border-collapse:collapse;font-size:0.84rem;}
+    .flow-table th,.flow-table td{padding:8px 6px;text-align:center;border-bottom:1px solid #f1f3f4;}
+    .flow-table th{background:#f8f9fa;font-weight:700;color:#2c3e50;font-size:.78rem;}
+    .positive{color:#27ae60;font-weight:700;} .negative{color:#e74c3c;font-weight:700;}
+    .resumen-op{background:#f8f9fa;border:1px solid #dee2e6;border-radius:12px;padding:18px;margin-top:20px;}
+    .resumen-op h3{margin-bottom:10px;color:#2c3e50;}
+    .resumen-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;}
+    .resumen-op p{margin:3px 0;font-size:.92rem;}
+    
+    /* Estilos para validaciones y errores */
+    .error-container{background:#fee;border:1px solid #fcc;border-radius:8px;padding:12px;margin:12px 0;display:none;}
+    .error-container.show{display:block;animation:slideIn 0.3s ease;}
+    .error-container h4{color:#d63031;margin-bottom:8px;font-size:0.95rem;}
+    .error-list{list-style:none;padding:0;}
+    .error-list li{color:#d63031;font-size:0.85rem;margin:4px 0;padding-left:18px;position:relative;}
+    .error-list li::before{content:"⚠️";position:absolute;left:0;}
+    .form-group.error input,.form-group.error select{border-color:#d63031;background:#ffeaea;}
+    .form-group .field-error{color:#d63031;font-size:0.75rem;margin-top:4px;display:none;}
+    .form-group.error .field-error{display:block;}
+    .success-message{background:#d4edda;border:1px solid #c3e6cb;color:#155724;border-radius:8px;padding:12px;margin:12px 0;display:none;}
+    .success-message.show{display:block;animation:slideIn 0.3s ease;}
+    
+    @keyframes slideIn{from{opacity:0;transform:translateY(-10px);} to{opacity:1;transform:translateY(0);}}
+    @media (max-width: 900px){.main-content{grid-template-columns:1fr;}.metrics-grid{grid-template-columns:1fr;}.resumen-grid{grid-template-columns:1fr;}}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>💰 Análisis de Flujo de Fondos - Learcam</h1>
+      <p>Sistema de análisis de viabilidad financiera y capital de trabajo</p>
+    </div>
+
+    <div class="main-content">
+      <!-- IZQUIERDA: FORM -->
+      <div class="form-section">
+        <h2 class="section-title">📊 Variables Operativas</h2>
+
+        <div class="form-category">
+          <h3>🏭 Variables Principales</h3>
+          <div class="form-group">
+            <label for="ventasMensuales">Ventas Mensuales (equipos/mes)</label>
+            <input type="number" id="ventasMensuales" value="15" min="1" step="1">
+            <div class="field-error">Las ventas mensuales deben ser mayor a 0</div>
+          </div>
+          <div class="form-group">
+            <label for="formaPagoFOB">Forma de Pago FOB</label>
+            <select id="formaPagoFOB">
+              <option value="0">Contado</option>
+              <option value="30">30 días</option>
+              <option value="60">60 días</option>
+              <option value="90" selected>90 días</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="gastosFijos">Gastos Fijos Mensuales (USD)</label>
+            <input type="number" id="gastosFijos" value="24500" step="0.01" min="0">
+            <div class="field-error">Los gastos fijos no pueden ser negativos</div>
+          </div>
+        </div>
+
+        <div class="form-category">
+          <h3>💼 Modelo por Equipo</h3>
+          <div class="form-group"><label for="valorFOB">FOB por Equipo (USD)</label><input type="number" id="valorFOB" value="27000" step="0.01" min="1"><div class="field-error">El valor FOB debe ser mayor a 0</div></div>
+          <div class="form-group"><label for="valorVenta">Precio Venta con IVA (USD)</label><input type="number" id="valorVenta" value="48870" step="0.01" min="1"><div class="field-error">El precio de venta debe ser mayor a 0</div></div>
+          <div class="form-group"><label for="iva">IVA (%)</label><input type="number" id="iva" value="10.5" step="0.1" min="0" max="100"><div class="field-error">El IVA debe estar entre 0% y 100%</div></div>
+          <div class="form-group"><label for="anticipo">Anticipo (%)</label><input type="number" id="anticipo" value="30" step="0.1" min="0" max="100"><div class="field-error">El anticipo debe estar entre 0% y 100%</div></div>
+          <div class="form-group"><label for="cuotas">Cantidad de Cuotas</label><input type="number" id="cuotas" value="8" step="1" min="1" max="60"><div class="field-error">Las cuotas deben estar entre 1 y 60</div></div>
+          <div class="form-group"><label for="tasaFinanciacion">Tasa Financiación Anual (%)</label><input type="number" id="tasaFinanciacion" value="0" step="0.1" min="0" max="200"><div class="field-error">La tasa de financiación debe estar entre 0% y 200%</div></div>
+          <div class="form-group"><label for="tasaDescuento">Tasa Descuento Anual (%)</label><input type="number" id="tasaDescuento" value="40" step="0.1" min="0" max="200"><div class="field-error">La tasa de descuento debe estar entre 0% y 200%</div></div>
+          <div class="form-group"><label for="comisionConcesionario">Comisión Concesionario (%)</label><input type="number" id="comisionConcesionario" value="10" step="0.1" min="0" max="100"><div class="field-error">La comisión debe estar entre 0% y 100%</div></div>
+          <div class="form-group"><label for="porcentajeDistribuidor">% Ventas por Distribuidor</label><input type="number" id="porcentajeDistribuidor" value="70" step="1" min="0" max="100"><div class="field-error">El % distribuidor debe estar entre 0% y 100%</div></div>
+        </div>
+
+        <div class="form-category">
+          <h3>💸 Gastos Variables</h3>
+          <div class="form-group"><label for="despachantePorcentaje">Despachante (% base)</label><input type="number" id="despachantePorcentaje" value="1.5" step="0.1" min="0" max="50"><div class="field-error">El despachante debe estar entre 0% y 50%</div></div>
+          <div class="form-group"><label for="flete">Flete (USD)</label><input type="number" id="flete" value="2000" step="0.01" min="0"><div class="field-error">El flete no puede ser negativo</div></div>
+          <div class="form-group"><label for="seguroPorcentaje">Seguro (% base)</label><input type="number" id="seguroPorcentaje" value="1.5" step="0.1" min="0" max="50"><div class="field-error">El seguro debe estar entre 0% y 50%</div></div>
+          <div class="form-group"><label for="gastosVariosPorcentaje">Gastos Varios (% base)</label><input type="number" id="gastosVariosPorcentaje" value="2.0" step="0.1" min="0" max="50"><div class="field-error">Los gastos varios deben estar entre 0% y 50%</div></div>
+          <div class="form-group"><label for="ingBrutosPercepcionPorcentaje">Ingresos Brutos Perc. (% base)</label><input type="number" id="ingBrutosPercepcionPorcentaje" value="3.0" step="0.1" min="0" max="50"><div class="field-error">IIBB percepción debe estar entre 0% y 50%</div></div>
+          <div class="form-group"><label for="ingBrutosSaldoPorcentaje">Ingresos Brutos Saldo (% venta neta - perc.)</label><input type="number" id="ingBrutosSaldoPorcentaje" value="3.5" step="0.1" min="0" max="50"><div class="field-error">IIBB saldo debe estar entre 0% y 50%</div></div>
+          <div class="form-group"><label for="tasaSeguridad">Tasa Seguridad (USD)</label><input type="number" id="tasaSeguridad" value="0" step="0.01" min="0"><div class="field-error">La tasa de seguridad no puede ser negativa</div></div>
+        </div>
+
+        <!-- Contenedor de errores -->
+        <div id="errorContainer" class="error-container">
+          <h4>⚠️ Errores de Validación</h4>
+          <ul id="errorList" class="error-list"></ul>
+        </div>
+
+        <!-- Mensaje de éxito -->
+        <div id="successMessage" class="success-message">
+          ✅ Análisis completado exitosamente
+        </div>
+
+        <button class="calculate-btn" onclick="calcularFlujoFondos()">🔄 Analizar Flujo</button>
+      </div>
+
+      <!-- DERECHA: RESULTADOS -->
+      <div class="results-section">
+        <h2 class="section-title">📈 Resultados</h2>
+        <div id="semaforo"></div>
+        <div id="metricas"></div>
+        <div id="resultados"></div>
+        <div id="resumen"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Utilidades de formato
+    function formatCurrency(n){
+      return new Intl.NumberFormat('es-US',{style:'currency',currency:'USD',minimumFractionDigits:0,maximumFractionDigits:0}).format(n||0);
+    }
+
+    // Sistema de validación
+    const ValidationRules = {
+      ventasMensuales: { min: 1, max: 1000, required: true, message: "Las ventas mensuales deben estar entre 1 y 1000" },
+      gastosFijos: { min: 0, max: 10000000, required: true, message: "Los gastos fijos no pueden ser negativos" },
+      valorFOB: { min: 1, max: 10000000, required: true, message: "El valor FOB debe ser mayor a 0" },
+      valorVenta: { min: 1, max: 10000000, required: true, message: "El precio de venta debe ser mayor a 0" },
+      iva: { min: 0, max: 100, required: true, message: "El IVA debe estar entre 0% y 100%" },
+      anticipo: { min: 0, max: 100, required: true, message: "El anticipo debe estar entre 0% y 100%" },
+      cuotas: { min: 1, max: 60, required: true, message: "Las cuotas deben estar entre 1 y 60" },
+      tasaFinanciacion: { min: 0, max: 200, required: true, message: "La tasa de financiación debe estar entre 0% y 200%" },
+      tasaDescuento: { min: 0, max: 200, required: true, message: "La tasa de descuento debe estar entre 0% y 200%" },
+      comisionConcesionario: { min: 0, max: 100, required: true, message: "La comisión debe estar entre 0% y 100%" },
+      porcentajeDistribuidor: { min: 0, max: 100, required: true, message: "El % distribuidor debe estar entre 0% y 100%" },
+      despachantePorcentaje: { min: 0, max: 50, required: true, message: "El despachante debe estar entre 0% y 50%" },
+      flete: { min: 0, max: 1000000, required: true, message: "El flete no puede ser negativo" },
+      seguroPorcentaje: { min: 0, max: 50, required: true, message: "El seguro debe estar entre 0% y 50%" },
+      gastosVariosPorcentaje: { min: 0, max: 50, required: true, message: "Los gastos varios deben estar entre 0% y 50%" },
+      ingBrutosPercepcionPorcentaje: { min: 0, max: 50, required: true, message: "IIBB percepción debe estar entre 0% y 50%" },
+      ingBrutosSaldoPorcentaje: { min: 0, max: 50, required: true, message: "IIBB saldo debe estar entre 0% y 50%" },
+      tasaSeguridad: { min: 0, max: 1000000, required: true, message: "La tasa de seguridad no puede ser negativa" }
+    };
+
+    const BusinessRules = {
+      validateMargin: (fob, venta, iva) => {
+        const ventaNeta = venta / (1 + iva/100);
+        const margin = ((ventaNeta - fob) / ventaNeta) * 100;
+        if (margin < 0) return "El precio de venta debe ser mayor al FOB";
+        if (margin < 5) return "Margen muy bajo (< 5%), revisar rentabilidad";
+        return null;
+      },
+      validateFinancing: (anticipo, cuotas) => {
+        if (anticipo === 0 && cuotas > 12) return "Sin anticipo, máximo 12 cuotas recomendadas";
+        if (anticipo < 20 && cuotas > 24) return "Con anticipo < 20%, máximo 24 cuotas recomendadas";
+        return null;
+      },
+      validateRates: (finRate, discRate) => {
+        if (discRate < finRate) return "La tasa de descuento debería ser mayor a la de financiación";
+        return null;
+      }
+    };
+
+    function validateField(fieldId, value) {
+      const rule = ValidationRules[fieldId];
+      const errors = [];
+      
+      if (!rule) return errors;
+
+      if (rule.required && (value === null || value === undefined || value === '')) {
+        errors.push(`${fieldId} es requerido`);
+        return errors;
+      }
+
+      const numValue = parseFloat(value);
+      
+      if (isNaN(numValue)) {
+        errors.push(`${fieldId} debe ser un número válido`);
+        return errors;
+      }
+
+      if (rule.min !== undefined && numValue < rule.min) {
+        errors.push(rule.message);
+      }
+      if (rule.max !== undefined && numValue > rule.max) {
+        errors.push(rule.message);
+      }
+
+      return errors;
+    }
+
+    function validateAllFields() {
+      const errors = [];
+      const values = {};
+      
+      Object.keys(ValidationRules).forEach(fieldId => {
+        const element = document.getElementById(fieldId);
+        if (element) {
+          const value = element.value;
+          values[fieldId] = parseFloat(value) || 0;
+          const fieldErrors = validateField(fieldId, value);
+          
+          const formGroup = element.closest('.form-group');
+          if (fieldErrors.length > 0) {
+            formGroup.classList.add('error');
+            errors.push(...fieldErrors);
+          } else {
+            formGroup.classList.remove('error');
+          }
+        }
+      });
+
+      try {
+        const marginError = BusinessRules.validateMargin(values.valorFOB, values.valorVenta, values.iva);
+        if (marginError) errors.push(marginError);
+
+        const financingError = BusinessRules.validateFinancing(values.anticipo, values.cuotas);
+        if (financingError) errors.push(financingError);
+
+        const ratesError = BusinessRules.validateRates(values.tasaFinanciacion, values.tasaDescuento);
+        if (ratesError) errors.push(ratesError);
+      } catch (e) {
+        errors.push("Error en validaciones de negocio: " + e.message);
+      }
+
+      return { errors, values };
+    }
+
+    function showErrors(errors) {
+      const errorContainer = document.getElementById('errorContainer');
+      const errorList = document.getElementById('errorList');
+      const successMessage = document.getElementById('successMessage');
+
+      if (errors.length > 0) {
+        errorList.innerHTML = errors.map(error => `<li>${error}</li>`).join('');
+        errorContainer.classList.add('show');
+        successMessage.classList.remove('show');
+        return false;
+      } else {
+        errorContainer.classList.remove('show');
+        successMessage.classList.add('show');
+        setTimeout(() => successMessage.classList.remove('show'), 3000);
+        return true;
+      }
+    }
+
+    function safeCalculation(calculationFn, defaultValue = null) {
+      try {
+        const result = calculationFn();
+        if (result === null || result === undefined) {
+          console.warn('Cálculo retornó null/undefined');
+          return defaultValue;
+        }
+        if (typeof result === 'object') {
+          // Verificar que el objeto no tenga propiedades NaN o Infinity
+          for (const key in result) {
+            if (typeof result[key] === 'number' && (isNaN(result[key]) || !isFinite(result[key]))) {
+              console.warn(`Propiedad ${key} es NaN o infinita:`, result[key]);
+              result[key] = 0;
+            }
+          }
+          return result;
+        }
+        if (typeof result === 'number' && (isNaN(result) || !isFinite(result))) {
+          console.warn('Resultado numérico es NaN o infinito:', result);
+          return defaultValue || 0;
+        }
+        return result;
+      } catch (e) {
+        console.error("Error en cálculo:", e);
+        return defaultValue;
+      }
+    }
+
+    // Anual -> cuota mensual (francés)
+    function calcularCuotaMensual(monto,tasaAnual,cuotas){
+      const tm = (tasaAnual/100)/12;
+      if (cuotas<=0) return 0;
+      if (tm===0) return monto/cuotas;
+      const f = Math.pow(1+tm,cuotas);
+      return (monto*tm*f)/(f-1);
+    }
+
+    // Valor presente de cuotas
+    function valorPresenteCuotas(cuota,tasaAnual,cuotas){
+      const tm=(tasaAnual/100)/12;
+      let vp=0;
+      for(let i=1;i<=cuotas;i++){ vp += cuota/Math.pow(1+tm,i); }
+      return vp;
+    }
+
+    // Contribución por equipo
+    function calcularContribucionPorEquipo(){
+      try {
+        const valorFOB = +document.getElementById('valorFOB').value || 0;
+        const valorVenta = +document.getElementById('valorVenta').value || 0;
+        const iva = +document.getElementById('iva').value || 0;
+        const anticipoPct = +document.getElementById('anticipo').value || 0;
+        const cuotas = +document.getElementById('cuotas').value || 1;
+        const tasaFin = +document.getElementById('tasaFinanciacion').value || 0;
+        const tasaDesc = +document.getElementById('tasaDescuento').value || 0;
+        const comisionPct = +document.getElementById('comisionConcesionario').value || 0;
+        const pctDistrib = +document.getElementById('porcentajeDistribuidor').value || 0;
+
+        const despPct = +document.getElementById('despachantePorcentaje').value || 0;
+        const flete = +document.getElementById('flete').value || 0;
+        const segPct = +document.getElementById('seguroPorcentaje').value || 0;
+        const varPct = +document.getElementById('gastosVariosPorcentaje').value || 0;
+        const iibbPercPct = +document.getElementById('ingBrutosPercepcionPorcentaje').value || 0;
+        const iibbSaldoPct = +document.getElementById('ingBrutosSaldoPorcentaje').value || 0;
+        const tasaSeg = +document.getElementById('tasaSeguridad').value || 0;
+
+        console.log('Valores obtenidos:', {valorFOB, valorVenta, iva, anticipoPct, cuotas});
+
+        const ventaNeta = valorVenta / (1 + iva/100);
+        console.log('Venta neta calculada:', ventaNeta);
+
+        const base = valorFOB + flete;
+        const seguro = base * (segPct/100);
+        const baseFinal = valorFOB + flete + seguro;
+
+        const despachante = baseFinal * (despPct/100);
+        const gastosVarios = baseFinal * (varPct/100);
+        const iibbPerc = baseFinal * (iibbPercPct/100);
+        const iibbSaldo = Math.max(0, (ventaNeta * (iibbSaldoPct/100)) - iibbPerc);
+
+        const gastosVariablesTotales = despachante + flete + seguro + gastosVarios + iibbPerc + iibbSaldo + tasaSeg;
+
+        const comisionTotal = ventaNeta * (comisionPct/100) * (pctDistrib/100);
+
+        const anticipo = ventaNeta * (anticipoPct/100);
+        const montoFin = ventaNeta - anticipo;
+        
+        const cuota = calcularCuotaMensual(montoFin, tasaFin, cuotas);
+        const totalNominalCuotas = cuota * cuotas;
+        const vpCuotas = valorPresenteCuotas(cuota, tasaDesc, cuotas);
+
+        const interesesGanados = totalNominalCuotas - montoFin;
+        const interesesPerdidos = totalNominalCuotas - vpCuotas;
+
+        const totalCostos = valorFOB + gastosVariablesTotales + comisionTotal + interesesPerdidos;
+        const contribucionNeta = ventaNeta - totalCostos;
+
+        const resultado = {
+          valorFOB, 
+          valorVenta, 
+          iva, 
+          ventaNeta,
+          anticipo, 
+          cuotas, 
+          cuotaMensual: cuota,
+          gastosVariablesTotales, 
+          comisionTotal,
+          interesesGanados, 
+          interesesPerdidos,
+          contribucionNeta
+        };
+
+        console.log('Resultado del cálculo de equipo:', resultado);
+        return resultado;
+
+      } catch (error) {
+        console.error('Error en calcularContribucionPorEquipo:', error);
+        return null;
+      }
+    }
+
+    // NOF promedio
+    function calcularNOFPromedio(ventasMensuales, diasFOB, equipo){
+      const inventario = ventasMensuales * equipo.valorFOB * 0.5;
+      const cxc = (equipo.cuotas/2) * ventasMensuales * equipo.cuotaMensual;
+      const cxp = ventasMensuales * equipo.valorFOB * (diasFOB/30);
+      return inventario + cxc - cxp;
+    }
+
+    // Simulación de flujo mensual 12 meses
+    function calcularEscenario(ventasMensuales, diasPagoFOB, gastosFijos, equipo){
+      return safeCalculation(() => {
+        let saldo = 0;
+        let capitalMax = 0;
+        let mesPicoNeg = 1;
+        const flujo = [];
+        const cronograma = [];
+
+        for(let mes=1; mes<=12; mes++){
+          const anticipos = ventasMensuales * equipo.anticipo;
+          let cuotasCobradas = 0;
+          cronograma.forEach(c => { if (c.mes === mes) cuotasCobradas += c.monto; });
+          const ingresos = anticipos + cuotasCobradas;
+
+          let pagoFOB = 0;
+          if (diasPagoFOB === 0) pagoFOB = ventasMensuales * equipo.valorFOB;
+          else if (mes > (diasPagoFOB/30)) pagoFOB = ventasMensuales * equipo.valorFOB;
+
+          const egresos = pagoFOB +
+                          (ventasMensuales * equipo.gastosVariablesTotales) +
+                          (ventasMensuales * equipo.comisionTotal) +
+                          gastosFijos;
+
+          const flujoNeto = ingresos - egresos;
+          saldo += flujoNeto;
+
+          if (saldo < 0 && Math.abs(saldo) > capitalMax){
+            capitalMax = Math.abs(saldo);
+            mesPicoNeg = mes;
+          }
+
+          flujo.push({ mes, ingresos, egresos, flujo: flujoNeto, saldo });
+
+          for (let i=1; i<=equipo.cuotas; i++){
+            const mCobro = mes + i;
+            if (mCobro <= 12){
+              cronograma.push({ mes: mCobro, monto: ventasMensuales * equipo.cuotaMensual });
+            }
+          }
+        }
+
+        const mesAuto = (mesPicoNeg + 1) <= 12 ? (mesPicoNeg + 1) : '>12';
+        const nofPromedio = calcularNOFPromedio(ventasMensuales, diasPagoFOB, equipo);
+
+        return { diasPagoFOB, capitalMax, mesAuto, nofPromedio, flujo };
+      });
+    }
+
+    function determinarViabilidad(escenario, equipo){
+      if (escenario.capitalMax < 50000 && (escenario.mesAuto !== '>12' && +escenario.mesAuto <= 6) && equipo.contribucionNeta > 0) return 'verde';
+      if (escenario.capitalMax <= 120000 && (escenario.mesAuto !== '>12' && +escenario.mesAuto <= 12) && equipo.contribucionNeta >= 0) return 'amarillo';
+      return 'rojo';
+    }
+
+    function render(){
+      // Primero validamos todos los campos
+      const validation = validateAllFields();
+      
+      if (!showErrors(validation.errors)) {
+        // Si hay errores, no procesamos
+        document.getElementById('resultados').innerHTML = '<p style="text-align:center;color:#666;padding:40px;">Corrija los errores para ver los resultados</p>';
+        document.getElementById('metricas').innerHTML = '';
+        document.getElementById('resumen').innerHTML = '';
+        document.getElementById('semaforo').innerHTML = '';
+        return;
+      }
+
+      try {
+        const ventasMensuales = +document.getElementById('ventasMensuales').value || 1;
+        const gastosFijos = +document.getElementById('gastosFijos').value || 0;
+        const formaPagoFOB = +document.getElementById('formaPagoFOB').value || 0;
+
+        console.log('Calculando equipo...');
+        const equipo = calcularContribucionPorEquipo();
+        console.log('Equipo calculado:', equipo);
+        
+        console.log('Calculando escenario...');
+        const escenario = calcularEscenario(ventasMensuales, formaPagoFOB, gastosFijos, equipo);
+        console.log('Escenario calculado:', escenario);
+
+        // Verificar que los cálculos sean válidos con más detalle
+        if (!equipo) {
+          throw new Error('Error al calcular datos del equipo');
+        }
+        if (!escenario) {
+          throw new Error('Error al calcular escenario de flujo');
+        }
+        if (!equipo.ventaNeta || equipo.ventaNeta <= 0) {
+          throw new Error('Venta neta inválida');
+        }
+
+        // Semáforo
+        const v = determinarViabilidad(escenario, equipo);
+        document.getElementById('semaforo').innerHTML = `
+          <div class="semaforo">
+            <div class="light verde ${v==='verde'?'active':''}">🟢</div>
+            <div class="light amarillo ${v==='amarillo'?'active':''}">🟡</div>
+            <div class="light rojo ${v==='rojo'?'active':''}">🔴</div>
+          </div>
+        `;
+
+        // KPIs
+        const contribPct = safeCalculation(() => ((equipo.contribucionNeta/equipo.ventaNeta)*100), 0);
+        document.getElementById('metricas').innerHTML = `
+          <div class="metrics-grid">
+            <div class="metric-card">
+              <div class="metric-label">Capital Máximo Requerido</div>
+              <div class="metric-value">${formatCurrency(escenario.capitalMax)}</div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-label">Mes Autofinanciamiento</div>
+              <div class="metric-value">${escenario.mesAuto}</div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-label">% Contribución s/ Venta Neta</div>
+              <div class="metric-value">${contribPct.toFixed(1)}%</div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-label">NOF Promedio</div>
+              <div class="metric-value">${formatCurrency(escenario.nofPromedio)}</div>
+            </div>
+          </div>
+        `;
+
+        // Tabla de flujo
+        let rows = '';
+        if (escenario.flujo && Array.isArray(escenario.flujo)) {
+          escenario.flujo.forEach(f=>{
+            rows += `
+              <tr>
+                <td>${f.mes}</td>
+                <td>${formatCurrency(f.ingresos)}</td>
+                <td>${formatCurrency(f.egresos)}</td>
+                <td class="${f.flujo>=0?'positive':'negative'}">${formatCurrency(f.flujo)}</td>
+                <td class="${f.saldo>=0?'positive':'negative'}">${formatCurrency(f.saldo)}</td>
+              </tr>
+            `;
+          });
+        }
+
+        document.getElementById('resultados').innerHTML = `
+          <div class="flow-table">
+            <h3>💰 Flujo de Fondos (FOB ${escenario.diasPagoFOB} días)</h3>
+            <table>
+              <thead>
+                <tr>
+                  <th>Mes</th><th>Ingresos</th><th>Egresos</th><th>Flujo</th><th>Saldo</th>
+                </tr>
+              </thead>
+              <tbody>${rows}</tbody>
+            </table>
+          </div>
+        `;
+
+        // Resumen de la operación
+        document.getElementById('resumen').innerHTML = `
+          <div class="resumen-op">
+            <h3>📋 Resumen de la Operación</h3>
+            <div class="resumen-grid">
+              <p><strong>FOB por Equipo:</strong> ${formatCurrency(equipo.valorFOB)}</p>
+              <p><strong>Venta con IVA:</strong> ${formatCurrency(equipo.valorVenta)} (${equipo.iva}% IVA)</p>
+              <p><strong>Venta sin IVA:</strong> ${formatCurrency(equipo.ventaNeta)}</p>
+              <p><strong>Anticipo:</strong> ${formatCurrency(equipo.anticipo)} (${(+document.getElementById('anticipo').value||0).toFixed(1)}%)</p>
+              <p><strong>Financiación:</strong> ${equipo.cuotas} cuotas de ${formatCurrency(equipo.cuotaMensual)}</p>
+              <p><strong>Gastos Variables Totales:</strong> ${formatCurrency(equipo.gastosVariablesTotales)}</p>
+              <p><strong>Comisión Total:</strong> ${formatCurrency(equipo.comisionTotal)}</p>
+              <p><strong>Intereses Ganados (cliente):</strong> ${formatCurrency(equipo.interesesGanados)}</p>
+              <p><strong>Intereses Perdidos (descuento):</strong> ${formatCurrency(equipo.interesesPerdidos)}</p>
+            </div>
+          </div>
+        `;
+
+      } catch (error) {
+        console.error('Error en render:', error);
+        showErrors([`Error en los cálculos: ${error.message}`]);
+        document.getElementById('resultados').innerHTML = '<p style="text-align:center;color:#e74c3c;padding:40px;">Error en los cálculos. Verifique los datos ingresados.</p>';
+      }
+    }
+
+    // Inicializar y recalcular con validación en tiempo real
+    function calcularFlujoFondos(){ 
+      render(); 
+    }
+
+    // Validación en tiempo real por campo
+    function setupRealTimeValidation() {
+      document.querySelectorAll('input, select').forEach(el => {
+        // Validación inmediata al perder foco
+        el.addEventListener('blur', function() {
+          const fieldId = this.id;
+          const value = this.value;
+          const errors = validateField(fieldId, value);
+          
+          const formGroup = this.closest('.form-group');
+          if (errors.length > 0) {
+            formGroup.classList.add('error');
+          } else {
+            formGroup.classList.remove('error');
+          }
+        });
+
+        // Recalculo después de cambios (con pequeño delay para mejor UX)
+        let timeoutId;
+        el.addEventListener('input', function() {
+          clearTimeout(timeoutId);
+          timeoutId = setTimeout(() => {
+            render();
+          }, 500); // 500ms delay para evitar cálculos excesivos
+        });
+        
+        el.addEventListener('change', function() {
+          clearTimeout(timeoutId);
+          render();
+        });
+      });
+    }
+
+    document.addEventListener('DOMContentLoaded', ()=>{
+      render();
+      setupRealTimeValidation();
+      
+      // Mensaje inicial
+      console.log('💰 Sistema de Análisis Financiero Learcam - Validaciones activas');
+    });
+  </script>
+</body>
+</html>
